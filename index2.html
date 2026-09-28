@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Turnos - Catering</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Estilos para inputs numéricos sin flechas nativas molestas en móviles */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen pb-16">
+
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="bg-emerald-600 text-white p-2 rounded-xl flex items-center justify-center shadow-sm">
+          <i data-lucide="chef-hat" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight text-slate-900">Control Catering</h1>
+          <p class="text-xs text-slate-500 font-medium">9,00 € / hora · El Esparragal</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- Botón para modal de Backup / Restaurar -->
+        <button id="openBackupBtn" class="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors" title="Copia de seguridad y exportación">
+          <i data-lucide="database" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-5 space-y-6">
+
+    <!-- Selector de Mes y Estado de Cobro -->
+    <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <button id="prevMonthBtn" class="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors" title="Mes anterior">
+            <i data-lucide="chevron-left" class="w-5 h-5"></i>
+          </button>
+          <div class="flex items-center gap-2">
+            <i data-lucide="calendar" class="w-5 h-5 text-emerald-600"></i>
+            <h2 id="currentMonthLabel" class="text-lg font-bold text-slate-800 capitalize min-w-[150px]">Septiembre 2026</h2>
+          </div>
+          <button id="nextMonthBtn" class="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors" title="Mes siguiente">
+            <i data-lucide="chevron-right" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Botón toggle de Pagado / Pendiente -->
+        <div class="flex items-center gap-2">
+          <button id="monthPaidToggleBtn" class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border transition-all">
+            <i id="paidStatusIcon" data-lucide="clock" class="w-4 h-4"></i>
+            <span id="paidStatusText">Pendiente de cobro</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Banner de fecha estimada de cobro -->
+      <div id="paymentAlertBanner" class="mt-3.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium flex items-center justify-between gap-2 bg-amber-50 text-amber-900 border border-amber-200/60">
+        <div class="flex items-center gap-2">
+          <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0"></i>
+          <span id="payoutNoticeMsg">Este mes se cobra a mediados del mes siguiente (aprox. 15 de Octubre).</span>
+        </div>
+        <span id="payoutDayBadge" class="hidden sm:inline-block bg-amber-200/60 text-amber-900 text-xs px-2 py-0.5 rounded-md font-bold shrink-0">Día ~15</span>
+      </div>
+    </section>
+
+    <!-- Dashboard de Métricas del Mes -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <!-- Total a cobrar -->
+      <div class="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl p-4 shadow-sm col-span-2 sm:col-span-1">
+        <div class="flex justify-between items-start">
+          <span class="text-emerald-100 text-xs font-semibold uppercase tracking-wider">Total a Cobrar</span>
+          <span class="p-1.5 bg-white/10 rounded-lg"><i data-lucide="wallet" class="w-4 h-4 text-white"></i></span>
+        </div>
+        <div class="mt-2 text-2xl sm:text-3xl font-extrabold tracking-tight" id="dashTotalMoney">0,00 €</div>
+        <div class="mt-1 text-xs text-emerald-100/90 font-medium" id="dashSubtotalBreakdown">0,00 h + 0,00 gas</div>
+      </div>
+
+      <!-- Total horas trabajadas -->
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+        <div class="flex justify-between items-start">
+          <span class="text-slate-500 text-xs font-semibold uppercase tracking-wider">Horas Netas</span>
+          <span class="p-1.5 bg-slate-100 rounded-lg text-slate-600"><i data-lucide="clock" class="w-4 h-4"></i></span>
+        </div>
+        <div class="mt-2 text-2xl font-bold text-slate-900" id="dashTotalHours">0.0 h</div>
+        <div class="mt-1 text-xs text-slate-500 font-medium" id="dashHoursDetailed">0 horas 0 mins</div>
+      </div>
+
+      <!-- Dinero solo por horas (9€/h) -->
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+        <div class="flex justify-between items-start">
+          <span class="text-slate-500 text-xs font-semibold uppercase tracking-wider">Por Horas (9€)</span>
+          <span class="p-1.5 bg-slate-100 rounded-lg text-slate-600"><i data-lucide="badge-euro" class="w-4 h-4"></i></span>
+        </div>
+        <div class="mt-2 text-2xl font-bold text-slate-900" id="dashWorkMoney">0,00 €</div>
+        <div class="mt-1 text-xs text-slate-500 font-medium">Salario base generado</div>
+      </div>
+
+      <!-- Compensación Gasolina -->
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+        <div class="flex justify-between items-start">
+          <span class="text-slate-500 text-xs font-semibold uppercase tracking-wider">Gasolina</span>
+          <span class="p-1.5 bg-slate-100 rounded-lg text-slate-600"><i data-lucide="fuel" class="w-4 h-4"></i></span>
+        </div>
+        <div class="mt-2 text-2xl font-bold text-slate-900" id="dashFuelMoney">0,00 €</div>
+        <div class="mt-1 text-xs text-slate-500 font-medium" id="dashCarsCount">0 viajes con coche</div>
+      </div>
+    </section>
+
+    <!-- Formulario para Registrar / Editar Turno -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+          </div>
+          <h2 id="formTitle" class="text-base font-bold text-slate-900">Registrar Turno</h2>
+        </div>
+        <button id="cancelEditBtn" class="hidden text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1 rounded bg-rose-50 border border-rose-200">
+          Cancelar edición
+        </button>
+      </div>
+
+      <form id="shiftForm" class="space-y-4">
+        <input type="hidden" id="shiftId" value="">
+
+        <!-- Fecha y Ubicación -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Fecha -->
+          <div>
+            <label for="shiftDate" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Fecha del Evento *
+            </label>
+            <div class="relative">
+              <input type="date" id="shiftDate" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none transition-all">
+            </div>
+          </div>
+
+          <!-- Ubicación -->
+          <div>
+            <label for="shiftLocationSelect" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Lugar / Cortijo *
+            </label>
+            <select id="shiftLocationSelect" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none transition-all">
+              <option value="El Esparragal (Gerena)">El Esparragal (Gerena)</option>
+              <option value="OTHER">Otro sitio...</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Campo de texto condicional si elige 'Otro sitio...' -->
+        <div id="customLocationDiv" class="hidden">
+          <label for="customLocationInput" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Nombre del Cortijo / Lugar *
+          </label>
+          <input type="text" id="customLocationInput" placeholder="Ej: Hacienda San Rafael, Sevilla Este..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none">
+        </div>
+
+        <!-- Horas: Entrada y Salida -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="shiftStart" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Hora de Entrada *
+            </label>
+            <input type="time" id="shiftStart" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none transition-all">
+          </div>
+
+          <div>
+            <label for="shiftEnd" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Hora de Salida *
+            </label>
+            <input type="time" id="shiftEnd" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none transition-all">
+          </div>
+        </div>
+
+        <!-- Resumen calculado en vivo para el turno actual -->
+        <div id="liveCalcBox" class="p-3 bg-emerald-50/80 rounded-xl border border-emerald-200/70 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+          <div class="flex items-center gap-2 text-emerald-950 font-medium">
+            <i data-lucide="timer" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+            <span id="liveHoursText">0 h (0.00 h) calculadas</span>
+          </div>
+          <div class="font-bold text-emerald-800 text-sm sm:text-base" id="liveEarnedText">
+            0,00 € generados
+          </div>
+        </div>
+
+        <!-- Gasolina & Coche -->
+        <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/90 space-y-3">
+          <div class="flex items-center justify-between">
+            <label for="carToggle" class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" id="carToggle" class="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500">
+              <span class="text-sm font-bold text-slate-800">¿Pusiste tu coche en este turno?</span>
+            </label>
+            <span class="text-xs bg-slate-200 text-slate-700 font-semibold px-2 py-0.5 rounded-full">Transporte</span>
+          </div>
+
+          <!-- Campos de gasolina -->
+          <div id="fuelDetailsDiv" class="hidden pt-2 border-t border-slate-200/70 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+            <div>
+              <label for="fuelAmount" class="block text-xs font-semibold text-slate-600 mb-1">
+                Compensación Gasolina (€)
+              </label>
+              <div class="relative">
+                <input type="number" step="0.5" min="0" id="fuelAmount" value="15" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-bold">EUR</span>
+              </div>
+            </div>
+            <p id="fuelHelpText" class="text-xs text-slate-500 leading-snug">
+              En El Esparragal se asignan <span class="font-bold text-emerald-700">15,00 €</span> por trayecto automáticamente.
+            </p>
+          </div>
+        </div>
+
+        <!-- Notas opcionales -->
+        <div>
+          <label for="shiftNotes" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Notas opcionales (boda de noche, montaje, mesa presidencial...)
+          </label>
+          <input type="text" id="shiftNotes" placeholder="Ej: Boda de 200 pax, barra libre en el jardín..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none">
+        </div>
+
+        <!-- Botón Guardar -->
+        <button type="submit" id="saveShiftBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-emerald-600/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2">
+          <i data-lucide="check" class="w-5 h-5"></i>
+          <span id="saveBtnText">Guardar Turno</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- Lista de Turnos del Mes -->
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+          <span>Turnos Registrados</span>
+          <span id="shiftsCountBadge" class="bg-slate-200 text-slate-800 text-xs px-2.5 py-0.5 rounded-full font-semibold">0</span>
+        </h3>
+        <button id="exportCsvBtn" class="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1.5 py-1 px-2.5 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200/50">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          Descargar CSV
+        </button>
+      </div>
+
+      <!-- Contenedor dinámico de turnos -->
+      <div id="shiftsContainer" class="space-y-3">
+        <!-- Renderizado vía JavaScript -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal de Copia de Seguridad y Datos -->
+  <div id="backupModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="font-bold text-slate-900 flex items-center gap-2 text-base">
+          <i data-lucide="database" class="w-5 h-5 text-emerald-600"></i>
+          Copia de Seguridad y Datos
+        </h3>
+        <button id="closeBackupBtn" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-500">
+        Todos tus turnos están guardados en este navegador. Puedes exportar un archivo de respaldo o importarlo en otro dispositivo si cambias de móvil.
+      </p>
+
+      <div class="space-y-2 pt-1">
+        <button id="exportJsonBtn" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-2.5 px-3 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors">
+          <i data-lucide="file-json" class="w-4 h-4 text-emerald-600"></i>
+          Exportar Copia (JSON)
+        </button>
+
+        <label class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-2.5 px-3 rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors">
+          <i data-lucide="upload" class="w-4 h-4 text-emerald-600"></i>
+          Importar Copia (JSON)
+          <input type="file" id="importJsonInput" accept=".json" class="hidden">
+        </label>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex justify-between items-center">
+        <button id="clearAllBtn" class="text-xs text-rose-600 hover:text-rose-800 font-semibold">
+          Borrar todos los datos
+        </button>
+        <button id="doneBackupModalBtn" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700">
+          Listo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* Clave de almacenamiento local */
+    const STORAGE_KEY = 'catering_shifts_db_v1';
+    const SETTINGS_KEY = 'catering_settings_db_v1';
+    const HOURLY_RATE = 9.0; // 9 euros/hora fija
+
+    /* Estado de la aplicación */
+    let appState = {
+      shifts: [],
+      monthPayouts: {}, // { "2026-09": { isPaid: false, paidDate: null } }
+      selectedMonth: getFormattedMonthKey(new Date()) // Formato "YYYY-MM"
+    };
+
+    function getFormattedMonthKey(dateObj) {
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}`;
+    }
+
+    function formatMonthTitle(yearMonthStr) {
+      const [year, month] = yearMonthStr.split('-');
+      const d = new Date(parseInt(year), parseInt(month) - 1, 1);
+      return d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    }
+
+    function getNextMonthName(yearMonthStr) {
+      const [year, month] = yearMonthStr.split('-');
+      const d = new Date(parseInt(year), parseInt(month), 1);
+      return d.toLocaleDateString('es-ES', { month: 'long' });
+    }
+
+    /* Cálculo exacto de horas entre 2 horas (soporta cruzar medianoche) */
+    function computeShiftDuration(startStr, endStr) {
+      if (!startStr || !endStr) return { hoursDecimal: 0, hours: 0, minutes: 0 };
+      const [sH, sM] = startStr.split(':').map(Number);
+      const [eH, eM] = endStr.split(':').map(Number);
+
+      let startTotal = sH * 60 + sM;
+      let endTotal = eH * 60 + eM;
+
+      // Si la hora de salida es numéricamente menor o igual, asumimos que terminó al día siguiente
+      if (endTotal <= startTotal) {
+        endTotal += 24 * 60;
+      }
+
+      const diffMins = endTotal - startTotal;
+      const hours = Math.floor(diffMins / 60);
+      const minutes = diffMins % 60;
+      const hoursDecimal = Math.round((diffMins / 60) * 100) / 100;
+
+      return { hoursDecimal, hours, minutes, totalMins: diffMins };
+    }
+
+    function formatCurrency(num) {
+      return (Number(num) || 0).toLocaleString('es-ES', {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function loadData() {
+      try {
+        const rawShifts = localStorage.getItem(STORAGE_KEY);
+        if (rawShifts) {
+          appState.shifts = JSON.parse(rawShifts);
+        }
+        const rawSettings = localStorage.getItem(SETTINGS_KEY);
+        if (rawSettings) {
+          appState.monthPayouts = JSON.parse(rawSettings);
+        }
+      } catch (err) {
+        console.error("Error al cargar localStorage:", err);
+      }
+    }
+
+    function saveData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState.shifts));
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(appState.monthPayouts));
+      } catch (err) {
+        console.error("Error al guardar en localStorage:", err);
+      }
+    }
+
+    function renderDashboard() {
+      const currentKey = appState.selectedMonth;
+      document.getElementById('currentMonthLabel').textContent = formatMonthTitle(currentKey);
+
+      // Configurar aviso del pago al mes siguiente
+      const nextMonthName = getNextMonthName(currentKey);
+      const payoutMsg = document.getElementById('payoutNoticeMsg');
+      payoutMsg.textContent = `Este mes se cobra a mediados del mes siguiente (aprox. 15 de ${nextMonthName}).`;
+
+      // Estado de pago del mes
+      const payoutInfo = appState.monthPayouts[currentKey] || { isPaid: false, paidDate: null };
+      const paidBtn = document.getElementById('monthPaidToggleBtn');
+      const paidText = document.getElementById('paidStatusText');
+      const paidIcon = document.getElementById('paidStatusIcon');
+      const banner = document.getElementById('paymentAlertBanner');
+
+      if (payoutInfo.isPaid) {
+        paidBtn.className = "flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border transition-all bg-emerald-100 text-emerald-800 border-emerald-300";
+        paidText.textContent = "Pagado ✓";
+        paidIcon.setAttribute('data-lucide', 'check-circle');
+        banner.className = "mt-3.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium flex items-center justify-between gap-2 bg-emerald-50 text-emerald-900 border border-emerald-200/60";
+        payoutMsg.textContent = `Nómina cobrada correctamente (${payoutInfo.paidDate || 'Confirmado'}).`;
+      } else {
+        paidBtn.className = "flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border transition-all bg-amber-100 text-amber-900 border-amber-300";
+        paidText.textContent = "Pendiente de cobro";
+        paidIcon.setAttribute('data-lucide', 'clock');
+        banner.className = "mt-3.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium flex items-center justify-between gap-2 bg-amber-50 text-amber-900 border border-amber-200/60";
+      }
+
+      // Filtrar los turnos del mes seleccionado (por fecha "YYYY-MM")
+      const monthShifts = appState.shifts.filter(s => s.date.startsWith(currentKey));
+      document.getElementById('shiftsCountBadge').textContent = monthShifts.length;
+
+      let totalHours = 0;
+      let totalMinsNet = 0;
+      let totalWorkMoney = 0;
+      let totalFuel = 0;
+      let carsCount = 0;
+
+      monthShifts.forEach(shift => {
+        totalHours += shift.hoursDecimal;
+        totalMinsNet += (shift.hours * 60) + shift.minutes;
+        totalWorkMoney += (shift.hoursDecimal * HOURLY_RATE);
+        if (shift.hadCar) {
+          totalFuel += Number(shift.fuelCost || 0);
+          carsCount++;
+        }
+      });
+
+      const grandTotal = totalWorkMoney + totalFuel;
+
+      // Actualizar tarjetas de métricas
+      document.getElementById('dashTotalMoney').textContent = formatCurrency(grandTotal);
+      document.getElementById('dashSubtotalBreakdown').textContent = `${formatCurrency(totalWorkMoney)} (h) + ${formatCurrency(totalFuel)} (gas)`;
+
+      document.getElementById('dashTotalHours').textContent = `${totalHours.toFixed(1)} h`;
+      const netHoursFormatted = Math.floor(totalMinsNet / 60);
+      const netRemMins = totalMinsNet % 60;
+      document.getElementById('dashHoursDetailed').textContent = `${netHoursFormatted} h ${netRemMins} mins`;
+
+      document.getElementById('dashWorkMoney').textContent = formatCurrency(totalWorkMoney);
+      document.getElementById('dashFuelMoney').textContent = formatCurrency(totalFuel);
+      document.getElementById('dashCarsCount').textContent = `${carsCount} turno(s) con coche`;
+
+      renderShiftsList(monthShifts);
+      lucide.createIcons();
+    }
+
+    function renderShiftsList(shifts) {
+      const container = document.getElementById('shiftsContainer');
+      container.innerHTML = '';
+
+      if (shifts.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white rounded-2xl p-8 text-center border border-dashed border-slate-300">
+            <div class="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+              <i data-lucide="calendar-off" class="w-6 h-6"></i>
+            </div>
+            <p class="text-sm font-semibold text-slate-700">No hay turnos registrados en este mes</p>
+            <p class="text-xs text-slate-400 mt-1">Usa el formulario de arriba para añadir un evento de catering.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Ordenar cronológicamente (más recientes primero)
+      const sorted = [...shifts].sort((a, b) => new Date(b.date + 'T' + b.start) - new Date(a.date + 'T' + a.start));
+
+      sorted.forEach(shift => {
+        const totalShiftMoney = (shift.hoursDecimal * HOURLY_RATE) + (shift.hadCar ? Number(shift.fuelCost || 0) : 0);
+        const shiftCard = document.createElement('div');
+        shiftCard.className = "bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-slate-300 transition-all";
+
+        // Formato amigable de fecha (ej: Sábado 12 de Sep)
+        const dateObj = new Date(shift.date + 'T12:00:00');
+        const formattedDate = dateObj.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+
+        shiftCard.innerHTML = `
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-bold text-slate-900 capitalize text-sm sm:text-base">${formattedDate}</span>
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  ${shift.location}
+                </span>
+                ${shift.hadCar ? `
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                    <i data-lucide="car" class="w-3 h-3"></i> Coche (+${formatCurrency(shift.fuelCost)})
+                  </span>
+                ` : ''}
+              </div>
+              <div class="text-xs text-slate-500 flex items-center gap-3">
+                <span class="flex items-center gap-1">
+                  <i data-lucide="clock-3" class="w-3.5 h-3.5 text-slate-400"></i>
+                  ${shift.start} - ${shift.end}
+                </span>
+                <span>•</span>
+                <span class="font-medium text-slate-700">${shift.hours}h ${shift.minutes}m (${shift.hoursDecimal}h)</span>
+              </div>
+              ${shift.notes ? `<p class="text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded-md mt-1 inline-block border border-slate-100 italic">"${escapeHtml(shift.notes)}"</p>` : ''}
+            </div>
+
+            <div class="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+              <div class="text-right">
+                <div class="text-base sm:text-lg font-extrabold text-slate-900">${formatCurrency(totalShiftMoney)}</div>
+                <div class="text-[11px] text-slate-400">${formatCurrency(shift.hoursDecimal * HOURLY_RATE)} trabajo</div>
+              </div>
+              <div class="flex items-center gap-1">
+                <button onclick="editShift('${shift.id}')" class="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Editar turno">
+                  <i data-lucide="pencil" class="w-4 h-4"></i>
+                </button>
+                <button onclick="deleteShift('${shift.id}')" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Eliminar turno">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        container.appendChild(shiftCard);
+      });
+    }
+
+    function escapeHtml(string) {
+      if (!string) return '';
+      return String(string).replace(/[&<>"']/g, function(s) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s];
+      });
+    }
+
+    function updateLiveFormCalculations() {
+      const start = document.getElementById('shiftStart').value;
+      const end = document.getElementById('shiftEnd').value;
+      const hadCar = document.getElementById('carToggle').checked;
+      const fuelAmount = hadCar ? Number(document.getElementById('fuelAmount').value || 0) : 0;
+
+      if (!start || !end) {
+        document.getElementById('liveHoursText').textContent = "Selecciona hora de entrada y salida";
+        document.getElementById('liveEarnedText').textContent = "0,00 €";
+        return;
+      }
+
+      const duration = computeShiftDuration(start, end);
+      const workMoney = duration.hoursDecimal * HOURLY_RATE;
+      const totalGen = workMoney + fuelAmount;
+
+      document.getElementById('liveHoursText').textContent = `${duration.hours}h ${duration.minutes}m (${duration.hoursDecimal.toFixed(2)}h)`;
+      document.getElementById('liveEarnedText').textContent = `${formatCurrency(totalGen)} (${formatCurrency(workMoney)} + ${formatCurrency(fuelAmount)} gas)`;
+    }
+
+    function setupFormListeners() {
+      const locSelect = document.getElementById('shiftLocationSelect');
+      const customDiv = document.getElementById('customLocationDiv');
+      const carToggle = document.getElementById('carToggle');
+      const fuelDiv = document.getElementById('fuelDetailsDiv');
+      const fuelInput = document.getElementById('fuelAmount');
+      const fuelHelp = document.getElementById('fuelHelpText');
+
+      locSelect.addEventListener('change', () => {
+        if (locSelect.value === 'OTHER') {
+          customDiv.classList.remove('hidden');
+          fuelHelp.textContent = "Introduce el importe de kilometraje/gasolina acordado para este sitio.";
+        } else {
+          customDiv.classList.add('hidden');
+          fuelHelp.innerHTML = "En El Esparragal se asignan <span class=\"font-bold text-emerald-700\">15,00 €</span> por trayecto automáticamente.";
+          if (carToggle.checked) {
+            fuelInput.value = "15";
+          }
+        }
+        updateLiveFormCalculations();
+      });
+
+      carToggle.addEventListener('change', () => {
+        if (carToggle.checked) {
+          fuelDiv.classList.remove('hidden');
+          if (locSelect.value === 'El Esparragal (Gerena)') {
+            fuelInput.value = "15";
+          }
+        } else {
+          fuelDiv.classList.add('hidden');
+        }
+        updateLiveFormCalculations();
+      });
+
+      document.getElementById('shiftStart').addEventListener('input', updateLiveFormCalculations);
+      document.getElementById('shiftEnd').addEventListener('input', updateLiveFormCalculations);
+      fuelInput.addEventListener('input', updateLiveFormCalculations);
+
+      // Envío de formulario
+      document.getElementById('shiftForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveShiftFromForm();
+      });
+
+      // Cancelar edición
+      document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
+    }
+
+    function saveShiftFromForm() {
+      const id = document.getElementById('shiftId').value || ('shift_' + Date.now());
+      const date = document.getElementById('shiftDate').value;
+      const start = document.getElementById('shiftStart').value;
+      const end = document.getElementById('shiftEnd').value;
+      const locSelect = document.getElementById('shiftLocationSelect').value;
+      const customLoc = document.getElementById('customLocationInput').value.trim();
+      const location = (locSelect === 'OTHER') ? (customLoc || 'Otro sitio') : locSelect;
+      const hadCar = document.getElementById('carToggle').checked;
+      const fuelCost = hadCar ? Number(document.getElementById('fuelAmount').value || 0) : 0;
+      const notes = document.getElementById('shiftNotes').value.trim();
+
+      const duration = computeShiftDuration(start, end);
+
+      const shiftData = {
+        id,
+        date,
+        start,
+        end,
+        location,
+        hadCar,
+        fuelCost,
+        notes,
+        hours: duration.hours,
+        minutes: duration.minutes,
+        hoursDecimal: duration.hoursDecimal
+      };
+
+      // Si existía, se actualiza, si no se añade
+      const existingIndex = appState.shifts.findIndex(s => s.id === id);
+      if (existingIndex > -1) {
+        appState.shifts[existingIndex] = shiftData;
+      } else {
+        appState.shifts.push(shiftData);
+      }
+
+      // Asegurar que el mes seleccionado coincida con el mes del turno guardado
+      appState.selectedMonth = date.substring(0, 7);
+
+      saveData();
+      resetForm();
+      renderDashboard();
+    }
+
+    window.editShift = function(id) {
+      const shift = appState.shifts.find(s => s.id === id);
+      if (!shift) return;
+
+      document.getElementById('shiftId').value = shift.id;
+      document.getElementById('shiftDate').value = shift.date;
+      document.getElementById('shiftStart').value = shift.start;
+      document.getElementById('shiftEnd').value = shift.end;
+      document.getElementById('shiftNotes').value = shift.notes || '';
+
+      const locSelect = document.getElementById('shiftLocationSelect');
+      const customDiv = document.getElementById('customLocationDiv');
+      const customInput = document.getElementById('customLocationInput');
+
+      if (shift.location === 'El Esparragal (Gerena)') {
+        locSelect.value = 'El Esparragal (Gerena)';
+        customDiv.classList.add('hidden');
+      } else {
+        locSelect.value = 'OTHER';
+        customDiv.classList.remove('hidden');
+        customInput.value = shift.location;
+      }
+
+      const carToggle = document.getElementById('carToggle');
+      const fuelDiv = document.getElementById('fuelDetailsDiv');
+      const fuelInput = document.getElementById('fuelAmount');
+
+      carToggle.checked = !!shift.hadCar;
+      if (shift.hadCar) {
+        fuelDiv.classList.remove('hidden');
+        fuelInput.value = shift.fuelCost || 15;
+      } else {
+        fuelDiv.classList.add('hidden');
+      }
+
+      document.getElementById('formTitle').textContent = "Modificar Turno";
+      document.getElementById('saveBtnText').textContent = "Actualizar Cambios";
+      document.getElementById('cancelEditBtn').classList.remove('hidden');
+
+      updateLiveFormCalculations();
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+    };
+
+    window.deleteShift = function(id) {
+      const shift = appState.shifts.find(s => s.id === id);
+      if (!shift) return;
+      
+      // Borrado sin alert()
+      appState.shifts = appState.shifts.filter(s => s.id !== id);
+      saveData();
+      renderDashboard();
+    };
+
+    function resetForm() {
+      document.getElementById('shiftId').value = '';
+      document.getElementById('shiftForm').reset();
+      
+      // Fecha por defecto: hoy
+      const todayStr = new Date().toISOString().split('T')[0];
+      document.getElementById('shiftDate').value = todayStr;
+      
+      // Horas habituales orientativas para eventos
+      document.getElementById('shiftStart').value = '20:00';
+      document.getElementById('shiftEnd').value = '03:30';
+
+      document.getElementById('shiftLocationSelect').value = 'El Esparragal (Gerena)';
+      document.getElementById('customLocationDiv').classList.add('hidden');
+      document.getElementById('carToggle').checked = true;
+      document.getElementById('fuelDetailsDiv').classList.remove('hidden');
+      document.getElementById('fuelAmount').value = '15';
+
+      document.getElementById('formTitle').textContent = "Registrar Turno";
+      document.getElementById('saveBtnText').textContent = "Guardar Turno";
+      document.getElementById('cancelEditBtn').classList.add('hidden');
+
+      updateLiveFormCalculations();
+    }
+
+    function setupMonthNavigation() {
+      document.getElementById('prevMonthBtn').addEventListener('click', () => {
+        changeMonthOffset(-1);
+      });
+
+      document.getElementById('nextMonthBtn').addEventListener('click', () => {
+        changeMonthOffset(1);
+      });
+
+      document.getElementById('monthPaidToggleBtn').addEventListener('click', () => {
+        const key = appState.selectedMonth;
+        const current = appState.monthPayouts[key] || { isPaid: false, paidDate: null };
+        const newPaidStatus = !current.isPaid;
+        
+        const todayFormatted = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+
+        appState.monthPayouts[key] = {
+          isPaid: newPaidStatus,
+          paidDate: newPaidStatus ? todayFormatted : null
+        };
+
+        saveData();
+        renderDashboard();
+      });
+    }
+
+    function changeMonthOffset(offset) {
+      const [year, month] = appState.selectedMonth.split('-').map(Number);
+      const d = new Date(year, month - 1 + offset, 1);
+      appState.selectedMonth = getFormattedMonthKey(d);
+      renderDashboard();
+    }
+
+    function setupDataManagement() {
+      // CSV Export
+      document.getElementById('exportCsvBtn').addEventListener('click', () => {
+        const monthShifts = appState.shifts.filter(s => s.date.startsWith(appState.selectedMonth));
+        if (monthShifts.length === 0) {
+          const btn = document.getElementById('exportCsvBtn');
+          const original = btn.innerHTML;
+          btn.innerHTML = `<span>Sin turnos</span>`;
+          setTimeout(() => btn.innerHTML = original, 1500);
+          return;
+        }
+
+        let csv = "Fecha,Lugar,Entrada,Salida,Horas Decimales,Salario Base (EUR),Puso Coche,Gasolina (EUR),Total (EUR),Notas\n";
+        monthShifts.forEach(s => {
+          const workPay = (s.hoursDecimal * HOURLY_RATE).toFixed(2);
+          const gasPay = s.hadCar ? Number(s.fuelCost || 0).toFixed(2) : "0.00";
+          const total = (Number(workPay) + Number(gasPay)).toFixed(2);
+          const cleanNotes = (s.notes || '').replace(/"/g, '""');
+          csv += `"${s.date}","${s.location}","${s.start}","${s.end}",${s.hoursDecimal},${workPay},"${s.hadCar ? 'Sí' : 'No'}",${gasPay},${total},"${cleanNotes}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `catering_turnos_${appState.selectedMonth}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      // Modal handlers
+      const modal = document.getElementById('backupModal');
+      document.getElementById('openBackupBtn').addEventListener('click', () => modal.classList.remove('hidden'));
+      document.getElementById('closeBackupBtn').addEventListener('click', () => modal.classList.add('hidden'));
+      document.getElementById('doneBackupModalBtn').addEventListener('click', () => modal.classList.add('hidden'));
+
+      // JSON Export
+      document.getElementById('exportJsonBtn').addEventListener('click', () => {
+        const payload = {
+          exportDate: new Date().toISOString(),
+          shifts: appState.shifts,
+          monthPayouts: appState.monthPayouts
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `backup_turnos_catering_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      // JSON Import
+      document.getElementById('importJsonInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = JSON.parse(event.target.result);
+            if (Array.isArray(data.shifts)) {
+              appState.shifts = data.shifts;
+              if (data.monthPayouts) appState.monthPayouts = data.monthPayouts;
+              saveData();
+              renderDashboard();
+              modal.classList.add('hidden');
+            }
+          } catch (err) {
+            console.error("Error al leer JSON:", err);
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // Clear all data
+      document.getElementById('clearAllBtn').addEventListener('click', () => {
+        appState.shifts = [];
+        appState.monthPayouts = {};
+        saveData();
+        renderDashboard();
+        modal.classList.add('hidden');
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadData();
+      setupFormListeners();
+      setupMonthNavigation();
+      setupDataManagement();
+      resetForm();
+      renderDashboard();
+    });
+  </script>
+</body>
+</html>
